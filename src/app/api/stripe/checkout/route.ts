@@ -60,7 +60,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const institution = typedProfile.institution!
+    const institution = typedProfile.institution
+    if (!institution) {
+      return NextResponse.json(
+        { error: 'Institution data not found' },
+        { status: 400 }
+      )
+    }
     const currentTier = (institution.subscription_tier as SubscriptionTier) || 'starter'
     const targetTier = plan as SubscriptionTier
 
@@ -107,8 +113,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url })
   } catch (error) {
     console.error('Checkout session error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      { error: `Failed to create checkout session: ${errorMessage}` },
       { status: 500 }
     )
   }
