@@ -39,14 +39,14 @@ export async function POST(request: NextRequest) {
       id: string
       email: string
       institution_id: string | null
-      center: { id: string; name: string; email: string | null; subscription_tier: string | null } | null
+      institution: { id: string; name: string; email: string | null; subscription_tier: string | null } | null
     }
 
     const typedProfile = profile as UserProfile | null
 
     if (!typedProfile?.institution_id) {
       return NextResponse.json(
-        { error: 'No center associated with user' },
+        { error: 'No institution associated with user' },
         { status: 400 }
       )
     }
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const center = typedProfile.center!
-    const currentTier = (center.subscription_tier as SubscriptionTier) || 'starter'
+    const institution = typedProfile.institution!
+    const currentTier = (institution.subscription_tier as SubscriptionTier) || 'starter'
     const targetTier = plan as SubscriptionTier
 
     // Check if this is a downgrade
@@ -97,8 +97,8 @@ export async function POST(request: NextRequest) {
 
     const session = await createCheckoutSession({
       institutionId: typedProfile.institution_id!,
-      institutionEmail: center.email || typedProfile.email,
-      institutionName: center.name,
+      institutionEmail: institution.email || typedProfile.email,
+      institutionName: institution.name,
       plan: plan as SubscriptionPlan,
       successUrl: `${baseUrl}/dashboard/settings?subscription=success`,
       cancelUrl: `${baseUrl}/dashboard/settings?subscription=cancelled`,
