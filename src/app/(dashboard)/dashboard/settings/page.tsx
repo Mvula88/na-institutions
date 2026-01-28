@@ -36,6 +36,7 @@ import toast from 'react-hot-toast'
 import StudentNumberConfig from '@/components/settings/student-number-config'
 import SemesterManager from '@/components/settings/semester-manager'
 import AcademicYearManager from '@/components/settings/academic-year-manager'
+import { LogoUpload } from '@/components/branding/logo-upload'
 import { parseNumericInput, formatNumericValue } from '@/lib/numeric-input'
 import { FeeModelType } from '@/types/database'
 
@@ -47,6 +48,7 @@ interface InstitutionData {
   city: string
   primary_color: string
   secondary_color: string
+  logo_url: string | null
   bank_name: string
   account_number: string
   branch_code: string
@@ -109,6 +111,7 @@ export default function InstitutionSettingsPage() {
     city: '',
     primary_color: '#1E40AF',
     secondary_color: '#F59E0B',
+    logo_url: null,
     bank_name: '',
     account_number: '',
     branch_code: '',
@@ -158,6 +161,7 @@ export default function InstitutionSettingsPage() {
         city: institution.city || '',
         primary_color: institution.primary_color || '#1E40AF',
         secondary_color: institution.secondary_color || '#F59E0B',
+        logo_url: institution.logo_url || null,
         bank_name: institution.bank_name || '',
         account_number: institution.account_number || '',
         branch_code: institution.branch_code || '',
@@ -1174,6 +1178,17 @@ export default function InstitutionSettingsPage() {
               </div>
 
               <form onSubmit={(e) => handleInstitutionUpdate(e, true)} className="space-y-6">
+                {/* Logo Upload Section */}
+                {user?.institution_id && (
+                  <div className="pb-6 border-b border-gray-200">
+                    <LogoUpload
+                      centerId={user.institution_id}
+                      currentLogoUrl={institutionData.logo_url}
+                      onUploadComplete={(url) => setInstitutionData({ ...institutionData, logo_url: url })}
+                    />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
