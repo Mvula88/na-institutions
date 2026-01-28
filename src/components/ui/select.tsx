@@ -106,7 +106,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
     return (
       <div
         ref={contentRef}
-        className={`absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg ${className || ""}`}
+        className={`absolute right-0 z-50 mt-1 max-h-60 min-w-[180px] w-max overflow-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg ${className || ""}`}
         {...props}
       >
         {children}
