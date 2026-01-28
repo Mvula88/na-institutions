@@ -30,7 +30,7 @@ interface SearchResult {
 const PAGES: SearchResult[] = [
   { id: 'dashboard', type: 'page', title: 'Dashboard', href: '/dashboard' },
   { id: 'students', type: 'page', title: 'Students', subtitle: 'Manage students', href: '/dashboard/students' },
-  { id: 'teachers', type: 'page', title: 'Teachers', subtitle: 'Manage teachers', href: '/dashboard/teachers' },
+  { id: 'lecturers', type: 'page', title: 'Lecturers', subtitle: 'Manage lecturers', href: '/dashboard/lecturers' },
   { id: 'payments', type: 'page', title: 'Payments', subtitle: 'View payments', href: '/dashboard/payments' },
   { id: 'courses', type: 'page', title: 'Courses', subtitle: 'Manage courses', href: '/dashboard/courses' },
   { id: 'reports', type: 'page', title: 'Reports', subtitle: 'View reports', href: '/dashboard/reports' },
@@ -157,7 +157,7 @@ export function GlobalSearch() {
           id: t.id,
           type: 'teacher',
           title: `${t.first_name} ${t.last_name}`,
-          subtitle: 'Teacher',
+          subtitle: 'Lecturer',
           href: `/dashboard/teachers/${t.id}`,
         })
       })

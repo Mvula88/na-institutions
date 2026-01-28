@@ -309,7 +309,7 @@ export default function CenterDetailPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{stats?.teachers || 0}</p>
-              <p className="text-sm text-gray-500">Teachers</p>
+              <p className="text-sm text-gray-500">Lecturers</p>
             </div>
           </div>
         </div>

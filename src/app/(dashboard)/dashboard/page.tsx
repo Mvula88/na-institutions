@@ -274,7 +274,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Active Teachers</p>
+              <p className="text-sm font-medium text-gray-500">Active Lecturers</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">{stats?.totalLecturers || 0}</p>
               <p className="text-sm text-gray-500 mt-1">Teaching staff</p>
             </div>

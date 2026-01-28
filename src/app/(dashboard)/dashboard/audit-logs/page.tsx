@@ -137,7 +137,7 @@ export default function AuditLogsPage() {
               >
                 <option value="">All Types</option>
                 <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
+                <option value="lecturer">Lecturer</option>
                 <option value="payment">Payment</option>
                 <option value="user">User</option>
                 <option value="subject">Subject</option>

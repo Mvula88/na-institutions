@@ -24,7 +24,7 @@ interface PlatformStats {
   suspendedCenters: number
   totalUsers: number
   totalStudents: number
-  totalTeachers: number
+  totalLecturers: number
   totalRevenue: number
   centersBySubscription: {
     basic: number

@@ -24,7 +24,7 @@ interface PlatformStats {
   totalStudentsAcrossPlatform: number
   centersWithHostel: number
   monthlyRevenue?: number
-  totalTeachers?: number
+  totalLecturers?: number
   recentCenters: {
     id: string
     name: string
