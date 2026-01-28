@@ -24,7 +24,7 @@ export default function NewUserPage() {
     password: '',
     full_name: '',
     phone: '',
-    role: 'center_staff' as 'super_admin' | 'center_admin' | 'center_staff',
+    role: 'institution_staff' as 'super_admin' | 'institution_admin' | 'institution_staff',
     center_id: '',
   })
 
@@ -165,8 +165,8 @@ export default function NewUserPage() {
             onChange={(e) => setFormData({ ...formData, role: e.target.value as typeof formData.role })}
             options={[
               { value: 'super_admin', label: 'Super Admin - Full platform access' },
-              { value: 'center_admin', label: 'Center Admin - Manage assigned center' },
-              { value: 'center_staff', label: 'Center Staff - Limited center access' },
+              { value: 'institution_admin', label: 'Institution Admin - Manage assigned institution' },
+              { value: 'institution_staff', label: 'Institution Staff - Limited institution access' },
             ]}
           />
 

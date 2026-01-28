@@ -148,7 +148,7 @@ export default function ChildGradesPage() {
             onChange={(e) => setSelectedSubject(e.target.value)}
             className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           >
-            <option value="all">All Subjects</option>
+            <option value="all">All Courses</option>
             {subjects.map(sub => (
               <option key={sub.id} value={sub.id}>{sub.name}</option>
             ))}
@@ -183,7 +183,7 @@ export default function ChildGradesPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center gap-2 text-gray-500 mb-2">
             <Award className="w-4 h-4" />
-            <span className="text-sm">Subjects</span>
+            <span className="text-sm">Courses</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{subjects.length}</p>
         </div>

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input, Select, Textarea } from '@/components/ui/input'
-import { ArrowLeft, Save, Upload, User, AlertTriangle, TrendingUp, Info } from 'lucide-react'
+import { ArrowLeft, Save, Upload, User, AlertTriangle, TrendingUp, Info, PlusCircle, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency } from '@/lib/currency'
 import { isValidSAPhoneNumber, getPhoneValidationError } from '@/lib/phone-validation'
@@ -67,6 +67,16 @@ export default function NewStudentPage() {
   const [currentAcademicYear, setCurrentAcademicYear] = useState<AcademicYear | null>(null)
   const [programCourses, setProgramCourses] = useState<(ProgramCourse & { course?: Subject })[]>([])
   const [useProgramEnrollment, setUseProgramEnrollment] = useState(false)
+
+  // Create program inline state
+  const [showCreateProgram, setShowCreateProgram] = useState(false)
+  const [isCreatingProgram, setIsCreatingProgram] = useState(false)
+  const [newProgramData, setNewProgramData] = useState({
+    name: '',
+    code: '',
+    duration_years: 1,
+    qualification_type: 'certificate',
+  })
 
   // Form state - Student Information
   const [formData, setFormData] = useState({
@@ -146,6 +156,45 @@ export default function NewStudentPage() {
 
     if (data) {
       setPrograms(data as Program[])
+    }
+  }
+
+  async function handleCreateProgram() {
+    if (!user?.institution_id || !newProgramData.name.trim()) {
+      toast.error('Please enter a program name')
+      return
+    }
+
+    setIsCreatingProgram(true)
+    const supabase = createClient()
+
+    try {
+      const { data: newProgram, error } = await supabase
+        .from('programs')
+        .insert({
+          institution_id: user.institution_id,
+          name: newProgramData.name.trim(),
+          code: newProgramData.code.trim().toUpperCase() || null,
+          duration_years: newProgramData.duration_years,
+          qualification_type: newProgramData.qualification_type,
+          is_active: true,
+        } as never)
+        .select('id')
+        .single()
+
+      if (error) throw error
+      if (!newProgram) throw new Error('Failed to create program')
+
+      await fetchPrograms()
+      setSelectedProgram((newProgram as { id: string }).id)
+      setShowCreateProgram(false)
+      setNewProgramData({ name: '', code: '', duration_years: 1, qualification_type: 'certificate' })
+      toast.success(`Program "${newProgramData.name}" created`)
+    } catch (error) {
+      console.error('Error creating program:', error)
+      toast.error('Failed to create program')
+    } finally {
+      setIsCreatingProgram(false)
     }
   }
 
@@ -968,22 +1017,107 @@ export default function NewStudentPage() {
                       <label className="block text-sm font-medium text-violet-900 mb-2">
                         Select Program
                       </label>
-                      <select
-                        value={selectedProgram}
-                        onChange={(e) => {
-                          setSelectedProgram(e.target.value)
-                          setSelectedSubjects([])
-                        }}
-                        className="w-full px-3 py-2 border border-violet-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-                      >
-                        <option value="">Choose a program...</option>
-                        {programs.map((program) => (
-                          <option key={program.id} value={program.id}>
-                            {program.name}
-                            {program.duration_years && ` (${program.duration_years} year${program.duration_years > 1 ? 's' : ''})`}
-                          </option>
-                        ))}
-                      </select>
+
+                      {/* Toggle buttons */}
+                      <div className="flex gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateProgram(false)}
+                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                            !showCreateProgram
+                              ? 'bg-violet-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Select Existing
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateProgram(true)}
+                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                            showCreateProgram
+                              ? 'bg-violet-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          <PlusCircle className="w-3 h-3" />
+                          Create New
+                        </button>
+                      </div>
+
+                      {!showCreateProgram ? (
+                        <select
+                          value={selectedProgram}
+                          onChange={(e) => {
+                            setSelectedProgram(e.target.value)
+                            setSelectedSubjects([])
+                          }}
+                          className="w-full px-3 py-2 border border-violet-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        >
+                          <option value="">Choose a program...</option>
+                          {programs.map((program) => (
+                            <option key={program.id} value={program.id}>
+                              {program.name}
+                              {program.duration_years && ` (${program.duration_years} year${program.duration_years > 1 ? 's' : ''})`}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="space-y-3 p-3 bg-violet-50 rounded-lg border border-violet-200">
+                          <div className="grid grid-cols-2 gap-3">
+                            <Input
+                              label="Program Name"
+                              value={newProgramData.name}
+                              onChange={(e) => setNewProgramData({ ...newProgramData, name: e.target.value })}
+                              placeholder="e.g., Bachelor of Accounting"
+                            />
+                            <Input
+                              label="Code"
+                              value={newProgramData.code}
+                              onChange={(e) => setNewProgramData({ ...newProgramData, code: e.target.value.toUpperCase() })}
+                              placeholder="e.g., BACC"
+                              maxLength={10}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Select
+                              label="Duration (Years)"
+                              value={newProgramData.duration_years.toString()}
+                              onChange={(e) => setNewProgramData({ ...newProgramData, duration_years: parseInt(e.target.value) || 1 })}
+                              options={[
+                                { value: '1', label: '1 Year' },
+                                { value: '2', label: '2 Years' },
+                                { value: '3', label: '3 Years' },
+                                { value: '4', label: '4 Years' },
+                                { value: '5', label: '5 Years' },
+                              ]}
+                            />
+                            <Select
+                              label="Qualification Type"
+                              value={newProgramData.qualification_type}
+                              onChange={(e) => setNewProgramData({ ...newProgramData, qualification_type: e.target.value })}
+                              options={[
+                                { value: 'certificate', label: 'Certificate' },
+                                { value: 'diploma', label: 'Diploma' },
+                                { value: 'degree', label: 'Degree' },
+                                { value: 'postgraduate', label: 'Postgraduate' },
+                              ]}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCreateProgram}
+                            disabled={isCreatingProgram || !newProgramData.name.trim()}
+                            leftIcon={isCreatingProgram ? <Loader2 className="w-3 h-3 animate-spin" /> : <PlusCircle className="w-3 h-3" />}
+                          >
+                            {isCreatingProgram ? 'Creating...' : 'Create Program'}
+                          </Button>
+                          <p className="text-xs text-violet-600">
+                            You can add courses to this program later in the Programs section.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Program Info */}

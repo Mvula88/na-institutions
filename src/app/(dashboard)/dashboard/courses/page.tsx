@@ -67,6 +67,12 @@ interface Course {
   }
 }
 
+interface Program {
+  id: string
+  name: string
+  duration_years: number | null
+}
+
 export default function CoursesPage() {
   const { user, isInstitutionAdmin } = useAuthStore()
   const canEdit = isInstitutionAdmin()
@@ -98,6 +104,13 @@ export default function CoursesPage() {
     default_installments: 1,
   })
 
+  // Program linking state
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [selectedProgramId, setSelectedProgramId] = useState('')
+  const [selectedYear, setSelectedYear] = useState(1)
+  const [selectedSemester, setSelectedSemester] = useState(1)
+  const [isCompulsory, setIsCompulsory] = useState(true)
+
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null)
@@ -108,7 +121,20 @@ export default function CoursesPage() {
 
   useEffect(() => {
     initializeAndFetchCourses()
+    fetchPrograms()
   }, [user?.institution_id])
+
+  async function fetchPrograms() {
+    if (!user?.institution_id) return
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('programs')
+      .select('id, name, duration_years')
+      .eq('institution_id', user.institution_id)
+      .eq('is_active', true)
+      .order('name')
+    if (data) setPrograms(data as Program[])
+  }
 
   async function fetchFeeModel() {
     if (!user?.institution_id) return
@@ -307,13 +333,41 @@ export default function CoursesPage() {
         if (error) throw error
         toast.success('Course updated successfully')
       } else {
-        const { error } = await supabase.from('courses').insert({
-          institution_id: user.institution_id,
-          ...courseData,
-        } as never)
+        // Create the course
+        const { data: newCourse, error } = await supabase
+          .from('courses')
+          .insert({
+            institution_id: user.institution_id,
+            ...courseData,
+          } as never)
+          .select('id')
+          .single()
 
         if (error) throw error
-        toast.success('Course added successfully')
+
+        // If a program is selected, link the course to it
+        if (selectedProgramId && newCourse) {
+          const { error: linkError } = await supabase
+            .from('program_courses')
+            .insert({
+              institution_id: user.institution_id,
+              program_id: selectedProgramId,
+              course_id: (newCourse as { id: string }).id,
+              year_of_study: selectedYear,
+              semester: selectedSemester,
+              is_compulsory: isCompulsory,
+            } as never)
+
+          if (linkError) {
+            console.error('Error linking course to program:', linkError)
+            toast.success('Course added, but failed to link to program')
+          } else {
+            const programName = programs.find(p => p.id === selectedProgramId)?.name
+            toast.success(`Course added and linked to ${programName}`)
+          }
+        } else {
+          toast.success('Course added successfully')
+        }
       }
 
       setShowModal(false)
@@ -369,6 +423,11 @@ export default function CoursesPage() {
       default_installments: 1,
     })
     setEditingCourse(null)
+    // Reset program linking
+    setSelectedProgramId('')
+    setSelectedYear(1)
+    setSelectedSemester(1)
+    setIsCompulsory(true)
   }
 
   function openEdit(course: Course) {
@@ -995,6 +1054,66 @@ export default function CoursesPage() {
                   Active (available for enrollment)
                 </label>
               </div>
+
+              {/* Program Linking - Only show when creating new course */}
+              {!editingCourse && programs.length > 0 && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">
+                    Link to Program (Optional)
+                  </h3>
+                  <div className="space-y-3">
+                    <Select
+                      label="Select Program"
+                      value={selectedProgramId}
+                      onChange={(e) => setSelectedProgramId(e.target.value)}
+                      options={[
+                        { value: '', label: 'No program (create course only)' },
+                        ...programs.map(p => ({
+                          value: p.id,
+                          label: p.name + (p.duration_years ? ` (${p.duration_years} yr)` : ''),
+                        })),
+                      ]}
+                    />
+
+                    {selectedProgramId && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Select
+                            label="Year of Study"
+                            value={selectedYear.toString()}
+                            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                            options={Array.from(
+                              { length: programs.find(p => p.id === selectedProgramId)?.duration_years || 4 },
+                              (_, i) => ({ value: (i + 1).toString(), label: `Year ${i + 1}` })
+                            )}
+                          />
+                          <Select
+                            label="Semester"
+                            value={selectedSemester.toString()}
+                            onChange={(e) => setSelectedSemester(parseInt(e.target.value))}
+                            options={[
+                              { value: '1', label: 'Semester 1' },
+                              { value: '2', label: 'Semester 2' },
+                            ]}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="is_compulsory"
+                            checked={isCompulsory}
+                            onChange={(e) => setIsCompulsory(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                          <label htmlFor="is_compulsory" className="text-sm text-gray-700">
+                            Compulsory course (core)
+                          </label>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button

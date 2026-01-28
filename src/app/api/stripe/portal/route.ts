@@ -55,7 +55,7 @@ export async function POST() {
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('institution_id', typedProfile.center_id)
-      .eq('role', 'center_staff')
+      .eq('role', 'institution_staff')
       .eq('is_active', true)
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'

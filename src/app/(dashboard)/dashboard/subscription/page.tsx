@@ -135,7 +135,7 @@ export default function SubscriptionPage() {
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('institution_id', user.institution_id)
-      .eq('role', 'center_staff')
+      .eq('role', 'institution_staff')
       .eq('is_active', true)
 
     setStaffCount(count || 0)

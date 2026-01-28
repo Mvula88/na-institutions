@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No center associated' }, { status: 400 })
     }
 
-    // Only center admins can revoke tokens
-    if (!['center_admin', 'super_admin'].includes(userData.role)) {
+    // Only institution admins can revoke tokens
+    if (!['institution_admin', 'super_admin'].includes(userData.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

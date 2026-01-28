@@ -42,10 +42,10 @@ const defaultChecklistItems: ChecklistItem[] = [
   },
   {
     id: 'add-subject',
-    title: 'Set up subjects',
-    description: 'Add the subjects you offer at your centre.',
+    title: 'Set up courses',
+    description: 'Add the courses you offer at your institution.',
     completed: false,
-    link: '/dashboard/subjects',
+    link: '/dashboard/courses',
   },
   {
     id: 'record-payment',

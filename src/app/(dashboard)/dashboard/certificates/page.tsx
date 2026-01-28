@@ -157,7 +157,13 @@ export default function CertificatesPage() {
 
     const { data, error, count } = await query
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error fetching certificates:', error.message)
+      // Table might not exist yet - migration needed
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn('issued_certificates table does not exist. Please run migration 053_priority_features.sql')
+      }
+    } else if (data) {
       setCertificates(data as unknown as IssuedCertificate[])
       setTotalCount(count || 0)
     }
@@ -228,8 +234,12 @@ export default function CertificatesPage() {
     const { error } = await (supabase as any).from('issued_certificates').insert(certificateData)
 
     if (error) {
-      console.error('Error issuing certificate:', error)
-      toast.error('Failed to issue certificate')
+      console.error('Error issuing certificate:', error.message || error)
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        toast.error('Certificates table not set up. Please run database migration 053_priority_features.sql')
+      } else {
+        toast.error('Failed to issue certificate: ' + (error.message || 'Unknown error'))
+      }
     } else {
       toast.success('Certificate issued successfully!')
       setIssueForm({

@@ -87,7 +87,7 @@ export default function StaffPage() {
       .from('users')
       .select('*')
       .eq('institution_id', user.institution_id)
-      .eq('role', 'center_staff')
+      .eq('role', 'institution_staff')
       .order('full_name')
 
     if (!error) {
@@ -114,7 +114,7 @@ export default function StaffPage() {
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('institution_id', user.institution_id)
-      .eq('role', 'center_staff')
+      .eq('role', 'institution_staff')
       .eq('is_active', true)
 
     const current = count || 0
@@ -164,7 +164,7 @@ export default function StaffPage() {
           password: addForm.password,
           full_name: addForm.full_name.trim(),
           phone: addForm.phone.trim() || null,
-          role: 'center_staff',
+          role: 'institution_staff',
           institution_id: user.institution_id,
         }),
       })

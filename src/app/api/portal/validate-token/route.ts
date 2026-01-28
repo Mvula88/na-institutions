@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { verifyPortalToken, hashToken, isValidTokenFormat, isPortalTokensConfigured } from '@/lib/portal-tokens'
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 interface ValidateTokenRequest {
   token: string
@@ -32,6 +33,16 @@ function decodeSimpleToken(token: string): { type: string; entityId: string; ins
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting to prevent token enumeration attacks
+    const rateLimitResponse = await rateLimit(request, {
+      ...RATE_LIMITS.api,
+      maxRequests: 30, // 30 validations per minute per IP
+      keyPrefix: 'portal-validate-token',
+    })
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
+
     const body: ValidateTokenRequest = await request.json()
     const { token, entityType } = body
 

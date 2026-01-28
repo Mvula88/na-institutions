@@ -27,7 +27,6 @@ interface Student {
   full_name: string
   student_number: string | null
   email: string | null
-  current_level: number | null
   status: string
   registration_date: string
   program?: {
@@ -77,12 +76,27 @@ export default function TranscriptsPage() {
   const [courseResults, setCourseResults] = useState<CourseResult[]>([])
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false)
 
+  // Debounce search query
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   useEffect(() => {
     if (user?.institution_id) {
       fetchPrograms()
+    }
+  }, [user?.institution_id])
+
+  useEffect(() => {
+    if (user?.institution_id) {
       fetchStudents()
     }
-  }, [user?.institution_id, currentPage, searchQuery, statusFilter, programFilter])
+  }, [user?.institution_id, currentPage, debouncedSearch, statusFilter, programFilter])
 
   async function fetchPrograms() {
     if (!user?.institution_id) return
@@ -106,13 +120,14 @@ export default function TranscriptsPage() {
       let query = supabase
         .from('students')
         .select(`
-          id, full_name, student_number, email, current_level, status, registration_date
+          id, full_name, student_number, email, status, registration_date
         `, { count: 'exact' })
         .eq('institution_id', user.institution_id)
         .order('full_name')
 
-      if (searchQuery) {
-        query = query.or(`full_name.ilike.%${searchQuery}%,student_number.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+      if (debouncedSearch && debouncedSearch.trim()) {
+        const search = debouncedSearch.trim()
+        query = query.or(`full_name.ilike.%${search}%,student_number.ilike.%${search}%,email.ilike.%${search}%`)
       }
       if (statusFilter) {
         query = query.eq('status', statusFilter)
@@ -123,7 +138,10 @@ export default function TranscriptsPage() {
 
       const { data: studentsData, count, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase students query error:', error.message, error.details, error.hint)
+        throw error
+      }
 
       // Then get program enrollments for these students
       const studentIds = (studentsData || []).map((s: any) => s.id)
@@ -131,7 +149,7 @@ export default function TranscriptsPage() {
       let studentsWithPrograms: any[] = studentsData || []
 
       if (studentIds.length > 0) {
-        const { data: enrollmentsData } = await supabase
+        const { data: enrollmentsData, error: enrollError } = await supabase
           .from('program_enrollments')
           .select(`
             student_id,
@@ -140,19 +158,25 @@ export default function TranscriptsPage() {
           .in('student_id', studentIds)
           .eq('status', 'enrolled')
 
-        const enrollments = (enrollmentsData || []) as Array<{
-          student_id: string
-          program: { id: string; name: string; program_code: string | null; qualification_type: string | null; nqf_level: number | null } | null
-        }>
+        // Don't fail if program_enrollments query fails (table might not exist)
+        if (enrollError) {
+          console.warn('Program enrollments query failed:', enrollError.message)
+          // Continue without program data
+        } else {
+          const enrollments = (enrollmentsData || []) as Array<{
+            student_id: string
+            program: { id: string; name: string; program_code: string | null; qualification_type: string | null; nqf_level: number | null } | null
+          }>
 
-        // Merge program data with students
-        studentsWithPrograms = (studentsData || []).map((student: any) => {
-          const enrollment = enrollments.find((e) => e.student_id === student.id)
-          return {
-            ...student,
-            program: enrollment?.program || null
-          }
-        })
+          // Merge program data with students
+          studentsWithPrograms = (studentsData || []).map((student: any) => {
+            const enrollment = enrollments.find((e) => e.student_id === student.id)
+            return {
+              ...student,
+              program: enrollment?.program || null
+            }
+          })
+        }
 
         // Filter by program if specified
         if (programFilter) {
@@ -164,8 +188,8 @@ export default function TranscriptsPage() {
 
       setStudents(studentsWithPrograms as Student[])
       setTotalCount(programFilter ? studentsWithPrograms.length : (count || 0))
-    } catch (error) {
-      console.error('Error fetching students:', error)
+    } catch (error: any) {
+      console.error('Error fetching students:', error?.message || error)
       toast.error('Failed to load students')
     } finally {
       setIsLoading(false)

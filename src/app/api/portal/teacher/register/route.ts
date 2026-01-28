@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (teacherError) {
       console.error('Teacher lookup error:', teacherError)
       return NextResponse.json(
-        { error: `Teacher lookup failed: ${teacherError.message}` },
+        { error: 'Teacher not found. Please verify your Teacher ID.' },
         { status: 404 }
       )
     }

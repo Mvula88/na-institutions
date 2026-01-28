@@ -85,88 +85,145 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Start transaction-like operations
-    // 1. Update the original payment status to 'reversed'
-    const { error: updateError } = await supabase
-      .from('payments')
-      .update({
-        status: 'reversed',
-        notes: `${payment.notes || ''}\n\n[REVERSED] ${new Date().toISOString()}: ${reason}`.trim(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', payment_id)
+    // Transaction-like operations with rollback tracking
+    // Store original states for potential rollback
+    const originalPaymentStatus = payment.status
+    const originalPaymentNotes = payment.notes
+    const feeRollbackData: { fee_id: string; original_amount_paid: number; original_status: string }[] = []
+    let paymentUpdated = false
+    let reversalCreated = false
+    let reversalId: string | null = null
 
-    if (updateError) {
-      console.error('Failed to update payment status:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to reverse payment' },
-        { status: 500 }
-      )
-    }
+    try {
+      // 1. Update the original payment status to 'reversed'
+      const { error: updateError } = await supabase
+        .from('payments')
+        .update({
+          status: 'reversed',
+          notes: `${payment.notes || ''}\n\n[REVERSED] ${new Date().toISOString()}: ${reason}`.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', payment_id)
 
-    // 2. Reverse the fee allocations - update fee paid amounts
-    const allocations = payment.payment_allocations || []
-    for (const allocation of allocations) {
-      // Get current fee
-      const { data: fee } = await supabase
-        .from('student_fees')
-        .select('id, amount_paid')
-        .eq('id', allocation.fee_id)
-        .single()
+      if (updateError) {
+        console.error('Failed to update payment status:', updateError)
+        throw new Error('Failed to update payment status')
+      }
+      paymentUpdated = true
 
-      if (fee) {
-        // Reduce the amount_paid by the allocation amount
-        const newAmountPaid = Math.max(0, (fee.amount_paid || 0) - allocation.amount)
-
-        // Determine new status based on amount paid
-        let newStatus = 'unpaid'
-        const { data: feeDetails } = await supabase
+      // 2. Reverse the fee allocations - update fee paid amounts
+      const allocations = payment.payment_allocations || []
+      for (const allocation of allocations) {
+        // Get current fee state for rollback
+        const { data: fee } = await supabase
           .from('student_fees')
-          .select('amount')
-          .eq('id', fee.id)
+          .select('id, amount_paid, amount, status')
+          .eq('id', allocation.fee_id)
           .single()
 
-        if (feeDetails && newAmountPaid > 0) {
-          newStatus = newAmountPaid >= feeDetails.amount ? 'paid' : 'partial'
-        }
+        if (fee) {
+          // Store original state for potential rollback
+          feeRollbackData.push({
+            fee_id: fee.id,
+            original_amount_paid: fee.amount_paid || 0,
+            original_status: fee.status || 'unpaid',
+          })
 
+          // Calculate new amount paid
+          const newAmountPaid = Math.max(0, (fee.amount_paid || 0) - allocation.amount)
+
+          // Determine new status based on amount paid
+          let newStatus = 'unpaid'
+          if (newAmountPaid > 0) {
+            newStatus = newAmountPaid >= fee.amount ? 'paid' : 'partial'
+          }
+
+          const { error: feeUpdateError } = await supabase
+            .from('student_fees')
+            .update({
+              amount_paid: newAmountPaid,
+              status: newStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', allocation.fee_id)
+
+          if (feeUpdateError) {
+            console.error('Failed to update fee:', feeUpdateError)
+            throw new Error(`Failed to update fee ${allocation.fee_id}`)
+          }
+        }
+      }
+
+      // 3. Create a reversal record for audit trail
+      const { data: reversal, error: reversalError } = await supabase
+        .from('payment_reversals')
+        .insert({
+          original_payment_id: payment_id,
+          institution_id: payment.institution_id,
+          student_id: payment.student_id,
+          amount: payment.amount,
+          reason,
+          reversed_by,
+          reversed_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (reversalError) {
+        // Log but don't fail - the reversal record is for audit purposes
+        console.warn('Could not create reversal record:', reversalError)
+      } else {
+        reversalCreated = true
+        reversalId = reversal?.id || null
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Payment reversed successfully',
+        payment_id,
+        reversal_id: reversalId,
+      })
+    } catch (rollbackError) {
+      // Attempt to rollback changes
+      console.error('Payment reversal failed, attempting rollback:', rollbackError)
+
+      // Rollback payment status if it was updated
+      if (paymentUpdated) {
+        await supabase
+          .from('payments')
+          .update({
+            status: originalPaymentStatus,
+            notes: originalPaymentNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', payment_id)
+      }
+
+      // Rollback fee updates
+      for (const feeData of feeRollbackData) {
         await supabase
           .from('student_fees')
           .update({
-            amount_paid: newAmountPaid,
-            status: newStatus,
+            amount_paid: feeData.original_amount_paid,
+            status: feeData.original_status,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', allocation.fee_id)
+          .eq('id', feeData.fee_id)
       }
+
+      // Delete reversal record if created
+      if (reversalCreated && reversalId) {
+        await supabase
+          .from('payment_reversals')
+          .delete()
+          .eq('id', reversalId)
+      }
+
+      return NextResponse.json(
+        { error: 'Failed to reverse payment. All changes have been rolled back.' },
+        { status: 500 }
+      )
     }
-
-    // 3. Create a reversal record for audit trail
-    const { data: reversal, error: reversalError } = await supabase
-      .from('payment_reversals')
-      .insert({
-        original_payment_id: payment_id,
-        institution_id: payment.institution_id,
-        student_id: payment.student_id,
-        amount: payment.amount,
-        reason,
-        reversed_by,
-        reversed_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (reversalError) {
-      // The reversal record table might not exist, but the reversal still happened
-      console.warn('Could not create reversal record (table may not exist):', reversalError)
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Payment reversed successfully',
-      payment_id,
-      reversal_id: reversal?.id,
-    })
   } catch (error) {
     console.error('Payment reversal error:', error)
     return NextResponse.json(

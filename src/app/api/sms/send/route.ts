@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No center associated' }, { status: 400 })
     }
 
-    // Only center_admin and center_staff can send SMS
-    if (!['center_admin', 'center_staff', 'super_admin'].includes(userData.role)) {
+    // Only institution_admin and institution_staff can send SMS
+    if (!['institution_admin', 'institution_staff', 'super_admin'].includes(userData.role)) {
       return NextResponse.json({ error: 'Insufficient permissions to send SMS' }, { status: 403 })
     }
 

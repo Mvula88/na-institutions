@@ -32,7 +32,7 @@ const PAGES: SearchResult[] = [
   { id: 'students', type: 'page', title: 'Students', subtitle: 'Manage students', href: '/dashboard/students' },
   { id: 'teachers', type: 'page', title: 'Teachers', subtitle: 'Manage teachers', href: '/dashboard/teachers' },
   { id: 'payments', type: 'page', title: 'Payments', subtitle: 'View payments', href: '/dashboard/payments' },
-  { id: 'subjects', type: 'page', title: 'Subjects', subtitle: 'Manage subjects', href: '/dashboard/subjects' },
+  { id: 'courses', type: 'page', title: 'Courses', subtitle: 'Manage courses', href: '/dashboard/courses' },
   { id: 'reports', type: 'page', title: 'Reports', subtitle: 'View reports', href: '/dashboard/reports' },
   { id: 'settings', type: 'page', title: 'Settings', subtitle: 'Center settings', href: '/dashboard/settings' },
   { id: 'subscription', type: 'page', title: 'Subscription', subtitle: 'Manage subscription', href: '/dashboard/subscription' },
@@ -162,14 +162,14 @@ export function GlobalSearch() {
         })
       })
 
-      // Add subjects
+      // Add courses
       subjects?.forEach((s) => {
         searchResults.push({
           id: s.id,
           type: 'subject',
           title: s.name,
-          subtitle: 'Subject',
-          href: `/dashboard/subjects`,
+          subtitle: 'Course',
+          href: `/dashboard/courses`,
         })
       })
 

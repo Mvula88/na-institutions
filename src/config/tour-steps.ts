@@ -10,7 +10,7 @@ export const dashboardTourSteps: TourStep[] = [
   {
     target: 'sidebar-students',
     title: 'Student Management',
-    content: 'Add and manage all your students here. You can track their details, subjects, and payment history.',
+    content: 'Add and manage all your students here. You can track their details, courses, and payment history.',
     placement: 'right',
   },
   {
@@ -20,9 +20,9 @@ export const dashboardTourSteps: TourStep[] = [
     placement: 'right',
   },
   {
-    target: 'sidebar-subjects',
-    title: 'Subjects & Classes',
-    content: 'Set up the subjects you offer and assign them to students. You can also set different fee amounts per subject.',
+    target: 'sidebar-courses',
+    title: 'Courses & Programs',
+    content: 'Set up the courses you offer and assign them to programs. You can also set different fee amounts per course.',
     placement: 'right',
   },
   {
@@ -55,7 +55,7 @@ export const studentsTourSteps: TourStep[] = [
   {
     target: 'add-student-btn',
     title: 'Add New Student',
-    content: 'Click here to register a new student. You\'ll be able to add their details, contact info, and subjects.',
+    content: 'Click here to register a new student. You\'ll be able to add their details, contact info, and courses.',
     placement: 'bottom',
   },
   {
@@ -67,7 +67,7 @@ export const studentsTourSteps: TourStep[] = [
   {
     target: 'student-filters',
     title: 'Filter Students',
-    content: 'Use filters to view students by grade, status, or subject. Helps when you have lots of students!',
+    content: 'Use filters to view students by program, status, or course. Helps when you have lots of students!',
     placement: 'bottom',
   },
 ]

@@ -306,16 +306,16 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Subjects</p>
+              <p className="text-sm font-medium text-gray-500">Courses</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">{stats?.totalCourses || 0}</p>
-              <p className="text-sm text-gray-500 mt-1">Active subjects</p>
+              <p className="text-sm text-gray-500 mt-1">Active courses</p>
             </div>
             <div className="p-3 bg-purple-50 rounded-xl">
               <BookOpen className="w-6 h-6 text-purple-600" />
             </div>
           </div>
-          <Link href="/dashboard/subjects" className="mt-4 flex items-center text-sm text-purple-600 font-medium hover:text-purple-700">
-            Manage subjects <ChevronRight className="w-4 h-4 ml-1" />
+          <Link href="/dashboard/courses" className="mt-4 flex items-center text-sm text-purple-600 font-medium hover:text-purple-700">
+            Manage courses <ChevronRight className="w-4 h-4 ml-1" />
           </Link>
         </div>
       </div>

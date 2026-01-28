@@ -669,7 +669,7 @@ export function SetupWizard() {
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                   <p className="text-sm text-blue-800 mb-3">
                     {feeModel === 'monthly_per_course'
-                      ? 'Start with common subjects and adjust prices later.'
+                      ? 'Start with common courses and adjust prices later.'
                       : feeModel === 'per_course_lumpsum'
                       ? 'Start with common VTC courses and adjust fees later.'
                       : 'Start with common courses. Fees are at semester level.'}

@@ -249,9 +249,16 @@ export default function RecordPaymentPage() {
 
       toast.success('Payment recorded successfully!')
       router.push(`/dashboard/payments/${paymentId}`)
-    } catch (error) {
-      console.error('Error recording payment:', error)
-      toast.error('Failed to record payment')
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string; details?: string; hint?: string }
+      console.error('Error recording payment:', {
+        message: err?.message,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint,
+        fullError: error
+      })
+      toast.error(err?.message || 'Failed to record payment')
     } finally {
       setIsLoading(false)
     }

@@ -86,8 +86,7 @@ interface StudentDocument {
   student?: {
     id: string
     student_number: string
-    first_name: string
-    last_name: string
+    full_name: string
   }
   category?: DocumentCategory
 }
@@ -109,8 +108,7 @@ interface StaffDocument {
 interface Student {
   id: string
   student_number: string
-  first_name: string
-  last_name: string
+  full_name: string
 }
 
 export default function DocumentsPage() {
@@ -163,15 +161,22 @@ export default function DocumentsPage() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      await Promise.all([
+      // Fetch data with graceful error handling for each
+      await Promise.allSettled([
         fetchCategories(),
         fetchStudentDocuments(),
         fetchStaffDocuments(),
         fetchStudents(),
       ])
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      toast.error('Failed to load documents')
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string; details?: string }
+      console.error('Error fetching data:', {
+        message: err?.message,
+        code: err?.code,
+        details: err?.details,
+        fullError: error
+      })
+      toast.error(err?.message || 'Failed to load documents')
     } finally {
       setLoading(false)
     }
@@ -184,7 +189,20 @@ export default function DocumentsPage() {
       .eq('institution_id', user?.institution_id)
       .order('name')
 
-    if (error) throw error
+    if (error) {
+      // Table might not exist yet
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn('document_categories table does not exist yet')
+        return
+      }
+      console.error('Error fetching categories:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      return
+    }
     setCategories(data || [])
   }
 
@@ -193,13 +211,26 @@ export default function DocumentsPage() {
       .from('student_documents')
       .select(`
         *,
-        student:students(id, student_number, first_name, last_name),
+        student:students(id, student_number, full_name),
         category:document_categories(id, name)
       `)
       .eq('institution_id', user?.institution_id)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      // Table might not exist yet
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn('student_documents table does not exist yet')
+        return
+      }
+      console.error('Error fetching student documents:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      return
+    }
     setStudentDocuments(data || [])
   }
 
@@ -213,20 +244,41 @@ export default function DocumentsPage() {
       .eq('institution_id', user?.institution_id)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      // Table might not exist yet
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn('staff_documents table does not exist yet')
+        return
+      }
+      console.error('Error fetching staff documents:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      return
+    }
     setStaffDocuments(data || [])
   }
 
   const fetchStudents = async () => {
     const { data, error } = await supabase
       .from('students')
-      .select('id, student_number, first_name, last_name')
+      .select('id, student_number, full_name')
       .eq('institution_id', user?.institution_id)
       .eq('status', 'active')
-      .order('last_name')
+      .order('full_name')
       .limit(500)
 
-    if (error) throw error
+    if (error) {
+      console.error('Error fetching students:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      return
+    }
     setStudents(data || [])
   }
 
@@ -315,18 +367,30 @@ export default function DocumentsPage() {
       const filePath = `${user?.institution_id}/${uploadType === 'student' ? 'students' : 'staff'}/${fileName}`
 
       // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
+      console.log('Uploading to storage...', { filePath, bucket: 'documents' })
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('documents')
         .upload(filePath, selectedFile)
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Storage upload failed:', {
+          message: uploadError.message,
+          name: uploadError.name,
+          error: uploadError
+        })
+        throw new Error(`Storage upload failed: ${uploadError.message}`)
+      }
+
+      console.log('Upload successful:', uploadData)
 
       // Get public URL
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath)
+      console.log('Public URL:', urlData.publicUrl)
 
       // Save document record
       if (uploadType === 'student') {
-        const { error } = await supabase.from('student_documents').insert([
+        console.log('Inserting student document record...')
+        const { error, data } = await supabase.from('student_documents').insert([
           {
             institution_id: user?.institution_id,
             student_id: uploadForm.student_id,
@@ -338,12 +402,22 @@ export default function DocumentsPage() {
             description: uploadForm.description || null,
             is_verified: false,
           },
-        ])
+        ]).select()
 
-        if (error) throw error
+        if (error) {
+          console.error('Database insert failed:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          })
+          throw new Error(`Database insert failed: ${error.message}`)
+        }
+        console.log('Document record created:', data)
         fetchStudentDocuments()
       } else {
-        const { error } = await supabase.from('staff_documents').insert([
+        console.log('Inserting staff document record...')
+        const { error, data } = await supabase.from('staff_documents').insert([
           {
             institution_id: user?.institution_id,
             category_id: uploadForm.category_id || null,
@@ -354,18 +428,34 @@ export default function DocumentsPage() {
             description: uploadForm.description || null,
             is_public: uploadForm.is_public,
           },
-        ])
+        ]).select()
 
-        if (error) throw error
+        if (error) {
+          console.error('Database insert failed:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          })
+          throw new Error(`Database insert failed: ${error.message}`)
+        }
+        console.log('Document record created:', data)
         fetchStaffDocuments()
       }
 
       toast.success('Document uploaded successfully')
       setShowUploadDialog(false)
       resetUploadForm()
-    } catch (error) {
-      console.error('Error uploading document:', error)
-      toast.error('Failed to upload document')
+    } catch (error: unknown) {
+      const err = error as { message?: string; statusCode?: string; error?: string; name?: string }
+      console.error('Error uploading document:', {
+        message: err?.message,
+        statusCode: err?.statusCode,
+        error: err?.error,
+        name: err?.name,
+        fullError: error
+      })
+      toast.error(err?.message || err?.error || 'Failed to upload document')
     } finally {
       setUploading(false)
     }
@@ -469,8 +559,7 @@ export default function DocumentsPage() {
     const matchesSearch =
       !searchTerm ||
       doc.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.student?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.student?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.student?.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.student?.student_number.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesCategory =
@@ -683,7 +772,7 @@ export default function DocumentsPage() {
                         <TableCell>
                           <div>
                             <p className="font-medium">
-                              {doc.student?.first_name} {doc.student?.last_name}
+                              {doc.student?.full_name}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {doc.student?.student_number}
@@ -1072,7 +1161,7 @@ export default function DocumentsPage() {
                   <SelectContent>
                     {students.map((student) => (
                       <SelectItem key={student.id} value={student.id}>
-                        {student.first_name} {student.last_name} ({student.student_number})
+                        {student.full_name} ({student.student_number})
                       </SelectItem>
                     ))}
                   </SelectContent>

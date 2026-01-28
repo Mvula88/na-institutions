@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (studentError) {
       console.error('Student lookup error:', studentError)
       return NextResponse.json(
-        { error: `Student lookup failed: ${studentError.message}` },
+        { error: 'Student not found. Please verify your Student ID.' },
         { status: 404 }
       )
     }

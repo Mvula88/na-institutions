@@ -26,6 +26,7 @@ import {
   Trash2,
   UserCheck,
   UserX,
+  PlusCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -117,6 +118,22 @@ export default function AttendancePage() {
     session: null,
   })
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Create course inline state
+  const [showCreateCourse, setShowCreateCourse] = useState(false)
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false)
+  const [newCourseData, setNewCourseData] = useState({
+    name: '',
+    course_code: '',
+  })
+
+  // Create lecturer inline state
+  const [showCreateLecturer, setShowCreateLecturer] = useState(false)
+  const [isCreatingLecturer, setIsCreatingLecturer] = useState(false)
+  const [newLecturerData, setNewLecturerData] = useState({
+    full_name: '',
+    email: '',
+  })
 
   useEffect(() => {
     if (user?.institution_id) {
@@ -255,6 +272,88 @@ export default function AttendancePage() {
       title: '',
       notes: '',
     })
+    setShowCreateCourse(false)
+    setShowCreateLecturer(false)
+    setNewCourseData({ name: '', course_code: '' })
+    setNewLecturerData({ full_name: '', email: '' })
+  }
+
+  async function handleCreateCourse() {
+    if (!user?.institution_id || !newCourseData.name.trim()) {
+      toast.error('Please enter a course name')
+      return
+    }
+
+    setIsCreatingCourse(true)
+    const supabase = createClient()
+
+    try {
+      const { data: newCourse, error } = await supabase
+        .from('courses')
+        .insert({
+          institution_id: user.institution_id,
+          name: newCourseData.name.trim(),
+          course_code: newCourseData.course_code.trim().toUpperCase() || null,
+          is_active: true,
+          monthly_fee: 0,
+          total_course_fee: 0,
+          allow_installments: false,
+          default_installments: 1,
+        } as never)
+        .select('id')
+        .single()
+
+      if (error) throw error
+      if (!newCourse) throw new Error('Failed to create course')
+
+      await fetchSubjects()
+      setSessionForm({ ...sessionForm, course_id: (newCourse as { id: string }).id })
+      setShowCreateCourse(false)
+      setNewCourseData({ name: '', course_code: '' })
+      toast.success(`Course "${newCourseData.name}" created`)
+    } catch (error) {
+      console.error('Error creating course:', error)
+      toast.error('Failed to create course')
+    } finally {
+      setIsCreatingCourse(false)
+    }
+  }
+
+  async function handleCreateLecturer() {
+    if (!user?.institution_id || !newLecturerData.full_name.trim()) {
+      toast.error('Please enter a lecturer name')
+      return
+    }
+
+    setIsCreatingLecturer(true)
+    const supabase = createClient()
+
+    try {
+      const { data: newLecturer, error } = await supabase
+        .from('lecturers')
+        .insert({
+          institution_id: user.institution_id,
+          full_name: newLecturerData.full_name.trim(),
+          email: newLecturerData.email.trim() || null,
+          status: 'active',
+        } as never)
+        .select('id')
+        .single()
+
+      if (error) throw error
+      if (!newLecturer) throw new Error('Failed to create lecturer')
+
+      await fetchTeachers()
+      setSessionForm({ ...sessionForm, lecturer_id: (newLecturer as { id: string }).id })
+      setShowCreateLecturer(false)
+      setNewLecturerData({ full_name: '', email: '' })
+      toast.success(`Lecturer "${newLecturerData.full_name}" created`)
+    } catch (error) {
+      console.error('Error creating lecturer:', error)
+      toast.error('Failed to create lecturer')
+    } finally {
+      setIsCreatingLecturer(false)
+    }
   }
 
   async function openTakeAttendance(session: AttendanceSession) {
@@ -868,24 +967,137 @@ export default function AttendancePage() {
                 value={sessionForm.session_date}
                 onChange={(e) => setSessionForm({ ...sessionForm, session_date: e.target.value })}
               />
-              <Select
-                label="Course (Optional)"
-                options={[
-                  { value: '', label: 'General Attendance' },
-                  ...subjects.map(s => ({ value: s.id, label: s.name }))
-                ]}
-                value={sessionForm.course_id}
-                onChange={(e) => setSessionForm({ ...sessionForm, course_id: e.target.value })}
-              />
-              <Select
-                label="Lecturer (Optional)"
-                options={[
-                  { value: '', label: 'Select Lecturer' },
-                  ...teachers.map(t => ({ value: t.id, label: t.full_name }))
-                ]}
-                value={sessionForm.lecturer_id}
-                onChange={(e) => setSessionForm({ ...sessionForm, lecturer_id: e.target.value })}
-              />
+
+              {/* Course Selection with Create New option */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Course (Optional)</label>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCourse(false)}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                      !showCreateCourse ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Select Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCourse(true)}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                      showCreateCourse ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    Create New
+                  </button>
+                </div>
+                {!showCreateCourse ? (
+                  <select
+                    value={sessionForm.course_id}
+                    onChange={(e) => setSessionForm({ ...sessionForm, course_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">General Attendance</option>
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.code ? `${s.code} - ` : ''}{s.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        label="Course Name"
+                        value={newCourseData.name}
+                        onChange={(e) => setNewCourseData({ ...newCourseData, name: e.target.value })}
+                        placeholder="e.g., Mathematics"
+                      />
+                      <Input
+                        label="Code"
+                        value={newCourseData.course_code}
+                        onChange={(e) => setNewCourseData({ ...newCourseData, course_code: e.target.value.toUpperCase() })}
+                        placeholder="e.g., MATH"
+                        maxLength={10}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCreateCourse}
+                      disabled={isCreatingCourse || !newCourseData.name.trim()}
+                      leftIcon={isCreatingCourse ? <Loader2 className="w-3 h-3 animate-spin" /> : <PlusCircle className="w-3 h-3" />}
+                    >
+                      {isCreatingCourse ? 'Creating...' : 'Create Course'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Lecturer Selection with Create New option */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Lecturer (Optional)</label>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateLecturer(false)}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                      !showCreateLecturer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Select Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateLecturer(true)}
+                    className={`px-2 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                      showCreateLecturer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    Create New
+                  </button>
+                </div>
+                {!showCreateLecturer ? (
+                  <select
+                    value={sessionForm.lecturer_id}
+                    onChange={(e) => setSessionForm({ ...sessionForm, lecturer_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Select Lecturer</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>{t.full_name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        label="Full Name"
+                        value={newLecturerData.full_name}
+                        onChange={(e) => setNewLecturerData({ ...newLecturerData, full_name: e.target.value })}
+                        placeholder="e.g., John Smith"
+                      />
+                      <Input
+                        label="Email (Optional)"
+                        type="email"
+                        value={newLecturerData.email}
+                        onChange={(e) => setNewLecturerData({ ...newLecturerData, email: e.target.value })}
+                        placeholder="e.g., john@email.com"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCreateLecturer}
+                      disabled={isCreatingLecturer || !newLecturerData.full_name.trim()}
+                      leftIcon={isCreatingLecturer ? <Loader2 className="w-3 h-3 animate-spin" /> : <PlusCircle className="w-3 h-3" />}
+                    >
+                      {isCreatingLecturer ? 'Creating...' : 'Create Lecturer'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Start Time"

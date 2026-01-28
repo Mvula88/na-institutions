@@ -24,8 +24,10 @@ import {
   CheckCircle,
   AlertTriangle,
   BarChart3,
+  PlusCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { nqfLevels } from '@/config/terminology'
 
 interface Course {
   id: string
@@ -56,7 +58,6 @@ interface Student {
   id: string
   full_name: string
   student_number: string | null
-  current_level: number | null
 }
 
 interface StudentGrade {
@@ -146,6 +147,16 @@ export default function AssessmentsPage() {
     assessment: null,
   })
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Create course inline state
+  const [showCreateCourse, setShowCreateCourse] = useState(false)
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false)
+  const [newCourseData, setNewCourseData] = useState({
+    name: '',
+    course_code: '',
+    credits: 0,
+    nqf_level: 0,
+  })
 
   useEffect(() => {
     if (user?.institution_id) {
@@ -306,6 +317,8 @@ export default function AssessmentsPage() {
       academic_year: new Date().getFullYear().toString(),
     })
     setEditingAssessment(null)
+    setShowCreateCourse(false)
+    setNewCourseData({ name: '', course_code: '', credits: 0, nqf_level: 0 })
   }
 
   function openEditAssessment(assessment: Assessment) {
@@ -352,7 +365,7 @@ export default function AssessmentsPage() {
       // Fetch student details
       const { data: students } = await supabase
         .from('students')
-        .select('id, full_name, student_number, current_level')
+        .select('id, full_name, student_number')
         .in('id', studentIds)
         .eq('status', 'active')
         .order('full_name')
@@ -482,6 +495,50 @@ export default function AssessmentsPage() {
       toast.error('Failed to delete assessment')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  async function handleCreateCourse() {
+    if (!user?.institution_id || !newCourseData.name.trim()) {
+      toast.error('Please enter a course name')
+      return
+    }
+
+    setIsCreatingCourse(true)
+    const supabase = createClient()
+
+    try {
+      const { data: newCourse, error } = await supabase
+        .from('courses')
+        .insert({
+          institution_id: user.institution_id,
+          name: newCourseData.name.trim(),
+          course_code: newCourseData.course_code.trim().toUpperCase() || null,
+          credits: newCourseData.credits || null,
+          nqf_level: newCourseData.nqf_level || null,
+          is_active: true,
+          monthly_fee: 0,
+          total_course_fee: 0,
+          allow_installments: false,
+          default_installments: 1,
+        } as never)
+        .select('id')
+        .single()
+
+      if (error) throw error
+      if (!newCourse) throw new Error('Failed to create course')
+
+      // Refresh courses and auto-select the new course
+      await fetchCourses()
+      setAssessmentForm({ ...assessmentForm, course_id: (newCourse as { id: string }).id })
+      setShowCreateCourse(false)
+      setNewCourseData({ name: '', course_code: '', credits: 0, nqf_level: 0 })
+      toast.success(`Course "${newCourseData.name}" created`)
+    } catch (error) {
+      console.error('Error creating course:', error)
+      toast.error('Failed to create course')
+    } finally {
+      setIsCreatingCourse(false)
     }
   }
 
@@ -842,7 +899,7 @@ export default function AssessmentsPage() {
                             <td className="px-6 py-4">
                               <p className="font-medium text-gray-900">{sg.student.full_name}</p>
                               <p className="text-sm text-gray-500">
-                                {sg.student.student_number} {sg.student.current_level && `• Level ${sg.student.current_level}`}
+                                {sg.student.student_number}
                               </p>
                             </td>
                             <td className="px-6 py-4">
@@ -912,16 +969,109 @@ export default function AssessmentsPage() {
               </button>
             </div>
             <form onSubmit={handleSaveAssessment} className="p-6 space-y-4">
-              <Select
-                label="Course"
-                required
-                value={assessmentForm.course_id}
-                onChange={(e) => setAssessmentForm({ ...assessmentForm, course_id: e.target.value })}
-                options={[
-                  { value: '', label: 'Select Course' },
-                  ...courses.map(c => ({ value: c.id, label: c.name }))
-                ]}
-              />
+              {/* Course Selection with Create New option */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Course <span className="text-red-500">*</span>
+                </label>
+
+                {/* Toggle buttons */}
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCourse(false)}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      !showCreateCourse
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Select Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCourse(true)}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                      showCreateCourse
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    Create New
+                  </button>
+                </div>
+
+                {/* Select existing course */}
+                {!showCreateCourse && (
+                  <select
+                    required
+                    value={assessmentForm.course_id}
+                    onChange={(e) => setAssessmentForm({ ...assessmentForm, course_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Select Course</option>
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.course_code ? `${c.course_code} - ` : ''}{c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Create new course inline */}
+                {showCreateCourse && (
+                  <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Course Name"
+                        required
+                        value={newCourseData.name}
+                        onChange={(e) => setNewCourseData({ ...newCourseData, name: e.target.value })}
+                        placeholder="e.g., Mathematics"
+                      />
+                      <Input
+                        label="Course Code"
+                        value={newCourseData.course_code}
+                        onChange={(e) => setNewCourseData({ ...newCourseData, course_code: e.target.value.toUpperCase() })}
+                        placeholder="e.g., MATH101"
+                        maxLength={10}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Select
+                        label="NQF Level"
+                        value={newCourseData.nqf_level.toString()}
+                        onChange={(e) => setNewCourseData({ ...newCourseData, nqf_level: parseInt(e.target.value) || 0 })}
+                        options={[
+                          { value: '0', label: 'Select level...' },
+                          ...nqfLevels.map(l => ({
+                            value: l.level.toString(),
+                            label: `Level ${l.level}`,
+                          })),
+                        ]}
+                      />
+                      <Input
+                        label="Credits"
+                        type="number"
+                        value={newCourseData.credits || ''}
+                        onChange={(e) => setNewCourseData({ ...newCourseData, credits: parseInt(e.target.value) || 0 })}
+                        placeholder="e.g., 12"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCreateCourse}
+                      disabled={isCreatingCourse || !newCourseData.name.trim()}
+                      leftIcon={isCreatingCourse ? <Loader2 className="w-3 h-3 animate-spin" /> : <PlusCircle className="w-3 h-3" />}
+                    >
+                      {isCreatingCourse ? 'Creating...' : 'Create Course'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <Input
                 label="Assessment Name"
                 required

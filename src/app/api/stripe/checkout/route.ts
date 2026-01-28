@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         .from('users')
         .select('id', { count: 'exact', head: true })
         .eq('institution_id', typedProfile.institution_id)
-        .eq('role', 'center_staff')
+        .eq('role', 'institution_staff')
         .eq('is_active', true)
 
       const currentStaff = staffCount || 0

@@ -10,11 +10,17 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret for security
+    // Verify cron secret for security - REQUIRED in production
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Always require CRON_SECRET - do not allow unauthenticated access
+    if (!cronSecret) {
+      console.error('CRON_SECRET environment variable is not configured')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

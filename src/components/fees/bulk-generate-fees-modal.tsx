@@ -685,7 +685,7 @@ export function BulkGenerateFeesModal({ isOpen, onClose, onSuccess }: BulkGenera
                   <div className="text-sm text-amber-800">
                     <p className="font-medium">No eligible students found</p>
                     <p className="mt-1">
-                      There are no active students with enrolled subjects.
+                      There are no active students with enrolled courses.
                     </p>
                   </div>
                 </div>
