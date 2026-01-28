@@ -26,8 +26,8 @@ interface ReportStats {
   totalStudents: number
   activeStudents: number
   newStudentsThisMonth: number
-  totalTeachers: number
-  totalSubjects: number
+  totalLecturers: number
+  totalCourses: number
   totalFeesExpected: number
   totalFeesCollected: number
   totalOutstanding: number
@@ -42,8 +42,8 @@ interface ReportStats {
     month: string
     amount: number
   }[]
-  studentsByGrade: {
-    grade: string
+  studentsByYearOfStudy: {
+    year: string
     count: number
   }[]
   feeStatusBreakdown: {
@@ -120,15 +120,15 @@ export default function ReportsPage() {
         .select('id, status, grade, created_at')
         .eq('institution_id', user.institution_id)
 
-      // Fetch teachers
-      const { count: teacherCount } = await supabase
+      // Fetch lecturers
+      const { count: lecturerCount } = await supabase
         .from('lecturers')
         .select('id', { count: 'exact' })
         .eq('institution_id', user.institution_id)
         .eq('status', 'active')
 
-      // Fetch subjects
-      const { count: subjectCount } = await supabase
+      // Fetch courses
+      const { count: courseCount } = await supabase
         .from('courses')
         .select('id', { count: 'exact' })
         .eq('institution_id', user.institution_id)
@@ -175,13 +175,13 @@ export default function ReportsPage() {
         mobile_money: typedPayments.filter(p => p.payment_method === 'mobile_money').reduce((sum, p) => sum + p.amount, 0),
       }
 
-      // Group students by grade
-      const gradeGroups: Record<string, number> = {}
+      // Group students by year of study
+      const yearGroups: Record<string, number> = {}
       typedStudents.forEach(s => {
-        const grade = s.grade || 'Unknown'
-        gradeGroups[grade] = (gradeGroups[grade] || 0) + 1
+        const year = s.grade ? `Year ${s.grade}` : 'Unassigned'
+        yearGroups[year] = (yearGroups[year] || 0) + 1
       })
-      const studentsByGrade = Object.entries(gradeGroups).map(([grade, count]) => ({ grade, count }))
+      const studentsByYearOfStudy = Object.entries(yearGroups).map(([year, count]) => ({ year, count }))
 
       // Monthly revenue (simplified)
       const monthlyRevenue = [
@@ -203,15 +203,15 @@ export default function ReportsPage() {
         totalStudents: students?.length || 0,
         activeStudents,
         newStudentsThisMonth: newStudents,
-        totalTeachers: teacherCount || 0,
-        totalSubjects: subjectCount || 0,
+        totalLecturers: lecturerCount || 0,
+        totalCourses: courseCount || 0,
         totalFeesExpected,
         totalFeesCollected,
         totalOutstanding,
         collectionRate: totalFeesExpected > 0 ? (totalFeesCollected / totalFeesExpected) * 100 : 0,
         paymentsByMethod,
         monthlyRevenue,
-        studentsByGrade,
+        studentsByYearOfStudy,
         feeStatusBreakdown,
       })
     } catch (error) {
@@ -257,8 +257,8 @@ export default function ReportsPage() {
       ['New Students This Month', stats.newStudentsThisMonth.toString()],
       [''],
       ['STAFF & COURSES', ''],
-      ['Total Teachers', stats.totalTeachers.toString()],
-      ['Total Active Courses', stats.totalSubjects.toString()],
+      ['Total Lecturers', stats.totalLecturers.toString()],
+      ['Total Active Courses', stats.totalCourses.toString()],
       [''],
       ['FINANCIAL SUMMARY', ''],
       ['Total Payments Received', formatCurrency(totalPayments)],
@@ -757,8 +757,8 @@ export default function ReportsPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Teachers</p>
-                <p className="mt-2 text-2xl font-semibold text-purple-600">{stats?.totalTeachers || 0}</p>
+                <p className="text-sm font-medium text-gray-500">Lecturers</p>
+                <p className="mt-2 text-2xl font-semibold text-purple-600">{stats?.totalLecturers || 0}</p>
                 <p className="mt-1 text-xs text-gray-500">
                   Active staff
                 </p>
@@ -855,17 +855,17 @@ export default function ReportsPage() {
         </div>
       </div>
 
-        {/* Students by Grade */}
+        {/* Students by Year of Study */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-6">
             <BarChart3 className="w-5 h-5 text-gray-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Students by Grade</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Students by Year of Study</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {stats?.studentsByGrade.map((item) => (
-              <div key={item.grade} className="bg-gray-50 rounded-lg p-4 text-center">
+            {stats?.studentsByYearOfStudy.map((item) => (
+              <div key={item.year} className="bg-gray-50 rounded-lg p-4 text-center">
                 <p className="text-2xl font-semibold text-gray-900">{item.count}</p>
-                <p className="text-sm text-gray-500">{item.grade}</p>
+                <p className="text-sm text-gray-500">{item.year}</p>
               </div>
             ))}
           </div>
@@ -882,7 +882,7 @@ export default function ReportsPage() {
             { title: 'Fee Collection Report', description: 'Detailed breakdown of all fees collected', icon: <DollarSign className="w-5 h-5" />, type: 'fee_collection' },
             { title: 'Student Enrollment', description: 'List of all enrolled students', icon: <GraduationCap className="w-5 h-5" />, type: 'student_enrollment' },
             { title: 'Outstanding Fees', description: 'Students with pending payments', icon: <CreditCard className="w-5 h-5" />, type: 'outstanding_fees' },
-            { title: 'Teacher Summary', description: 'Teacher assignments and courses', icon: <Users className="w-5 h-5" />, type: 'teacher_summary' },
+            { title: 'Lecturer Summary', description: 'Lecturer assignments and courses', icon: <Users className="w-5 h-5" />, type: 'teacher_summary' },
             { title: 'Monthly Summary', description: 'Monthly performance overview', icon: <Calendar className="w-5 h-5" />, type: 'monthly_summary' },
             { title: 'Payment History', description: 'All payment transactions', icon: <FileText className="w-5 h-5" />, type: 'payment_history' },
             { title: 'Attendance Report', description: 'Student attendance summary and details', icon: <ClipboardCheck className="w-5 h-5" />, type: 'attendance_report' },
