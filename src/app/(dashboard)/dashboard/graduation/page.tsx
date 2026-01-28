@@ -624,10 +624,10 @@ export default function GraduationPage() {
                     />
                   </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Filter status" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="min-w-[180px]">
                       <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="eligible">Eligible</SelectItem>
                       <SelectItem value="not_eligible">Not Eligible</SelectItem>
