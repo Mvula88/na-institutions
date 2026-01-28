@@ -55,17 +55,25 @@ import toast from 'react-hot-toast'
 interface Program {
   id: string
   name: string
-  code: string
+  program_code: string
   duration_years: number
 }
 
 interface GraduationRequirement {
   id: string
+  institution_id: string
   program_id: string
-  requirement_type: string
-  description: string
-  min_value: number | null
-  is_mandatory: boolean
+  min_total_credits: number | null
+  min_core_credits: number | null
+  min_elective_credits: number | null
+  min_gpa: number | null
+  min_major_gpa: number | null
+  requires_internship: boolean
+  min_internship_hours: number | null
+  requires_thesis: boolean
+  requires_final_exam: boolean
+  requires_fee_clearance: boolean
+  additional_requirements: string | null
   program?: Program
 }
 
@@ -73,21 +81,35 @@ interface Student {
   id: string
   student_number: string
   first_name: string
-  last_name: string
+  surname: string
+  full_name: string
   email: string
 }
 
 interface StudentGraduationStatus {
   id: string
   student_id: string
-  program_id: string
-  total_requirements: number
-  requirements_met: number
-  is_eligible: boolean
+  program_enrollment_id: string | null
+  institution_id: string
+  total_credits_earned: number
+  core_credits_earned: number
+  elective_credits_earned: number
+  current_gpa: number | null
+  credits_requirement_met: boolean
+  gpa_requirement_met: boolean
+  internship_requirement_met: boolean
+  thesis_requirement_met: boolean
+  fee_clearance_met: boolean
+  graduation_status: string
+  expected_graduation_date: string | null
+  actual_graduation_date: string | null
+  graduation_honors: string | null
   graduation_ceremony_id: string | null
-  status: string
+  reviewed_by: string | null
+  approved_by: string | null
+  notes: string | null
   student?: Student
-  program?: Program
+  program_enrollment?: { program?: Program }
 }
 
 interface GraduationCeremony {
@@ -96,9 +118,10 @@ interface GraduationCeremony {
   ceremony_date: string
   venue: string
   status: string
-  max_graduates: number | null
+  capacity: number | null
   registration_deadline: string | null
   notes: string | null
+  academic_year_id: string | null
 }
 
 export default function GraduationPage() {
@@ -129,17 +152,23 @@ export default function GraduationPage() {
   // Form state
   const [requirementForm, setRequirementForm] = useState({
     program_id: '',
-    requirement_type: 'credits',
-    description: '',
-    min_value: '',
-    is_mandatory: true,
+    min_total_credits: '',
+    min_core_credits: '',
+    min_elective_credits: '',
+    min_gpa: '',
+    requires_internship: false,
+    min_internship_hours: '',
+    requires_thesis: false,
+    requires_final_exam: false,
+    requires_fee_clearance: true,
+    additional_requirements: '',
   })
 
   const [ceremonyForm, setCeremonyForm] = useState({
     name: '',
     ceremony_date: '',
     venue: '',
-    max_graduates: '',
+    capacity: '',
     registration_deadline: '',
     notes: '',
   })
@@ -170,8 +199,9 @@ export default function GraduationPage() {
   const fetchPrograms = async () => {
     const { data, error } = await supabase
       .from('programs')
-      .select('id, name, code, duration_years')
+      .select('id, name, program_code, duration_years')
       .eq('institution_id', user?.institution_id)
+      .eq('is_active', true)
       .order('name')
 
     if (error) throw error
@@ -183,7 +213,7 @@ export default function GraduationPage() {
       .from('graduation_requirements')
       .select(`
         *,
-        program:programs(id, name, code)
+        program:programs(id, name, program_code)
       `)
       .eq('institution_id', user?.institution_id)
       .order('created_at', { ascending: false })
@@ -197,8 +227,8 @@ export default function GraduationPage() {
       .from('student_graduation_status')
       .select(`
         *,
-        student:students(id, student_number, first_name, last_name, email),
-        program:programs(id, name, code)
+        student:students(id, student_number, first_name, surname, full_name, email),
+        program_enrollment:program_enrollments(id, program:programs(id, name, program_code))
       `)
       .eq('institution_id', user?.institution_id)
       .order('created_at', { ascending: false })
@@ -219,8 +249,8 @@ export default function GraduationPage() {
   }
 
   const handleSaveRequirement = async () => {
-    if (!requirementForm.program_id || !requirementForm.description) {
-      toast.error('Please fill in all required fields')
+    if (!requirementForm.program_id) {
+      toast.error('Please select a program')
       return
     }
 
@@ -228,10 +258,16 @@ export default function GraduationPage() {
       const data = {
         institution_id: user?.institution_id,
         program_id: requirementForm.program_id,
-        requirement_type: requirementForm.requirement_type,
-        description: requirementForm.description,
-        min_value: requirementForm.min_value ? parseFloat(requirementForm.min_value) : null,
-        is_mandatory: requirementForm.is_mandatory,
+        min_total_credits: requirementForm.min_total_credits ? parseFloat(requirementForm.min_total_credits) : null,
+        min_core_credits: requirementForm.min_core_credits ? parseFloat(requirementForm.min_core_credits) : null,
+        min_elective_credits: requirementForm.min_elective_credits ? parseFloat(requirementForm.min_elective_credits) : null,
+        min_gpa: requirementForm.min_gpa ? parseFloat(requirementForm.min_gpa) : null,
+        requires_internship: requirementForm.requires_internship,
+        min_internship_hours: requirementForm.min_internship_hours ? parseInt(requirementForm.min_internship_hours) : null,
+        requires_thesis: requirementForm.requires_thesis,
+        requires_final_exam: requirementForm.requires_final_exam,
+        requires_fee_clearance: requirementForm.requires_fee_clearance,
+        additional_requirements: requirementForm.additional_requirements || null,
       }
 
       if (editingRequirement) {
@@ -290,7 +326,7 @@ export default function GraduationPage() {
         name: ceremonyForm.name,
         ceremony_date: ceremonyForm.ceremony_date,
         venue: ceremonyForm.venue,
-        max_graduates: ceremonyForm.max_graduates ? parseInt(ceremonyForm.max_graduates) : null,
+        capacity: ceremonyForm.capacity ? parseInt(ceremonyForm.capacity) : null,
         registration_deadline: ceremonyForm.registration_deadline || null,
         notes: ceremonyForm.notes || null,
         status: 'planned',
@@ -370,10 +406,16 @@ export default function GraduationPage() {
   const resetRequirementForm = () => {
     setRequirementForm({
       program_id: '',
-      requirement_type: 'credits',
-      description: '',
-      min_value: '',
-      is_mandatory: true,
+      min_total_credits: '',
+      min_core_credits: '',
+      min_elective_credits: '',
+      min_gpa: '',
+      requires_internship: false,
+      min_internship_hours: '',
+      requires_thesis: false,
+      requires_final_exam: false,
+      requires_fee_clearance: true,
+      additional_requirements: '',
     })
     setEditingRequirement(null)
   }
@@ -383,7 +425,7 @@ export default function GraduationPage() {
       name: '',
       ceremony_date: '',
       venue: '',
-      max_graduates: '',
+      capacity: '',
       registration_deadline: '',
       notes: '',
     })
@@ -394,10 +436,16 @@ export default function GraduationPage() {
     setEditingRequirement(req)
     setRequirementForm({
       program_id: req.program_id,
-      requirement_type: req.requirement_type,
-      description: req.description,
-      min_value: req.min_value?.toString() || '',
-      is_mandatory: req.is_mandatory,
+      min_total_credits: req.min_total_credits?.toString() || '',
+      min_core_credits: req.min_core_credits?.toString() || '',
+      min_elective_credits: req.min_elective_credits?.toString() || '',
+      min_gpa: req.min_gpa?.toString() || '',
+      requires_internship: req.requires_internship || false,
+      min_internship_hours: req.min_internship_hours?.toString() || '',
+      requires_thesis: req.requires_thesis || false,
+      requires_final_exam: req.requires_final_exam || false,
+      requires_fee_clearance: req.requires_fee_clearance || false,
+      additional_requirements: req.additional_requirements || '',
     })
     setShowRequirementDialog(true)
   }
@@ -408,34 +456,39 @@ export default function GraduationPage() {
       name: ceremony.name,
       ceremony_date: ceremony.ceremony_date,
       venue: ceremony.venue,
-      max_graduates: ceremony.max_graduates?.toString() || '',
+      capacity: ceremony.capacity?.toString() || '',
       registration_deadline: ceremony.registration_deadline || '',
       notes: ceremony.notes || '',
     })
     setShowCeremonyDialog(true)
   }
 
+  // Helper to check if all requirements are met
+  const isEligible = (s: StudentGraduationStatus) =>
+    s.credits_requirement_met && s.gpa_requirement_met && s.fee_clearance_met
+
   // Filter student statuses
   const filteredStudents = studentStatuses.filter((status) => {
+    const studentName = status.student?.full_name || `${status.student?.first_name || ''} ${status.student?.surname || ''}`
     const matchesSearch =
       !searchTerm ||
-      status.student?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      status.student?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      status.student?.student_number.toLowerCase().includes(searchTerm.toLowerCase())
+      studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      status.student?.student_number?.toLowerCase().includes(searchTerm.toLowerCase())
 
+    const eligible = isEligible(status)
     const matchesStatus =
       statusFilter === 'all' ||
-      (statusFilter === 'eligible' && status.is_eligible) ||
-      (statusFilter === 'not_eligible' && !status.is_eligible) ||
-      status.status === statusFilter
+      (statusFilter === 'eligible' && eligible) ||
+      (statusFilter === 'not_eligible' && !eligible) ||
+      status.graduation_status === statusFilter
 
     return matchesSearch && matchesStatus
   })
 
   // Stats
-  const eligibleCount = studentStatuses.filter((s) => s.is_eligible).length
-  const pendingCount = studentStatuses.filter((s) => s.status === 'pending').length
-  const graduatedCount = studentStatuses.filter((s) => s.status === 'graduated').length
+  const eligibleCount = studentStatuses.filter((s) => isEligible(s)).length
+  const pendingCount = studentStatuses.filter((s) => s.graduation_status === 'pending').length
+  const graduatedCount = studentStatuses.filter((s) => s.graduation_status === 'graduated').length
   const upcomingCeremonies = ceremonies.filter((c) => c.status === 'planned').length
 
   const getStatusBadge = (status: string) => {
@@ -465,27 +518,6 @@ export default function GraduationPage() {
         return <Badge variant="destructive">Cancelled</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  const getRequirementTypeLabel = (type: string) => {
-    switch (type) {
-      case 'credits':
-        return 'Minimum Credits'
-      case 'gpa':
-        return 'Minimum GPA'
-      case 'course':
-        return 'Required Course'
-      case 'internship':
-        return 'Internship Hours'
-      case 'attendance':
-        return 'Attendance Rate'
-      case 'fees':
-        return 'Fees Cleared'
-      case 'other':
-        return 'Other'
-      default:
-        return type
     }
   }
 
@@ -620,78 +652,81 @@ export default function GraduationPage() {
                     <TableRow>
                       <TableHead>Student</TableHead>
                       <TableHead>Program</TableHead>
-                      <TableHead>Progress</TableHead>
+                      <TableHead>GPA</TableHead>
+                      <TableHead>Credits</TableHead>
                       <TableHead>Eligible</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStudents.map((status) => (
-                      <TableRow key={status.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {status.student?.first_name} {status.student?.last_name}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {status.student?.student_number}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{status.program?.name || 'N/A'}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={
-                                status.total_requirements > 0
-                                  ? (status.requirements_met / status.total_requirements) * 100
-                                  : 0
-                              }
-                              className="w-20 h-2"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {status.requirements_met}/{status.total_requirements}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {status.is_eligible ? (
-                            <Badge className="bg-green-100 text-green-800">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Yes
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary">
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                              No
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(status.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setSelectedStudent(status)
-                                setShowStudentDetailDialog(true)
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRecalculateEligibility(status.id)}
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredStudents.map((status) => {
+                      const studentName = status.student?.full_name || `${status.student?.first_name || ''} ${status.student?.surname || ''}`
+                      const programName = status.program_enrollment?.program?.name || 'N/A'
+                      const eligible = isEligible(status)
+                      // Count how many requirements are met out of the key ones
+                      const reqsMet = [
+                        status.credits_requirement_met,
+                        status.gpa_requirement_met,
+                        status.fee_clearance_met,
+                        status.internship_requirement_met,
+                        status.thesis_requirement_met,
+                      ].filter(Boolean).length
+                      const totalReqs = 5
+
+                      return (
+                        <TableRow key={status.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{studentName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {status.student?.student_number}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{programName}</TableCell>
+                          <TableCell>{status.current_gpa?.toFixed(2) ?? '-'}</TableCell>
+                          <TableCell>
+                            <span className="text-sm">{status.total_credits_earned || 0}</span>
+                          </TableCell>
+                          <TableCell>
+                            {eligible ? (
+                              <Badge className="bg-green-100 text-green-800">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Yes
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                No
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(status.graduation_status)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setSelectedStudent(status)
+                                  setShowStudentDetailDialog(true)
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRecalculateEligibility(status.id)}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -733,10 +768,9 @@ export default function GraduationPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Program</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Minimum Value</TableHead>
-                      <TableHead>Mandatory</TableHead>
+                      <TableHead>Credits (Total/Core)</TableHead>
+                      <TableHead>Min GPA</TableHead>
+                      <TableHead>Requirements</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -746,15 +780,25 @@ export default function GraduationPage() {
                         <TableCell className="font-medium">
                           {req.program?.name || 'All Programs'}
                         </TableCell>
-                        <TableCell>{getRequirementTypeLabel(req.requirement_type)}</TableCell>
-                        <TableCell>{req.description}</TableCell>
-                        <TableCell>{req.min_value ?? '-'}</TableCell>
                         <TableCell>
-                          {req.is_mandatory ? (
-                            <Badge className="bg-red-100 text-red-800">Required</Badge>
-                          ) : (
-                            <Badge variant="outline">Optional</Badge>
-                          )}
+                          {req.min_total_credits ?? '-'} / {req.min_core_credits ?? '-'}
+                        </TableCell>
+                        <TableCell>{req.min_gpa ?? '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {req.requires_fee_clearance && (
+                              <Badge variant="outline" className="text-xs">Fees</Badge>
+                            )}
+                            {req.requires_internship && (
+                              <Badge variant="outline" className="text-xs">Internship</Badge>
+                            )}
+                            {req.requires_thesis && (
+                              <Badge variant="outline" className="text-xs">Thesis</Badge>
+                            )}
+                            {req.requires_final_exam && (
+                              <Badge variant="outline" className="text-xs">Final Exam</Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
@@ -838,10 +882,10 @@ export default function GraduationPage() {
                           <GraduationCap className="h-4 w-4 text-muted-foreground" />
                           <span>{ceremony.venue}</span>
                         </div>
-                        {ceremony.max_graduates && (
+                        {ceremony.capacity && (
                           <div className="flex items-center gap-2 text-sm">
                             <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>Max {ceremony.max_graduates} graduates</span>
+                            <span>Capacity: {ceremony.capacity} graduates</span>
                           </div>
                         )}
                         {ceremony.registration_deadline && (
@@ -928,61 +972,125 @@ export default function GraduationPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Requirement Type</Label>
-              <Select
-                value={requirementForm.requirement_type}
-                onValueChange={(value) =>
-                  setRequirementForm({ ...requirementForm, requirement_type: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="credits">Minimum Credits</SelectItem>
-                  <SelectItem value="gpa">Minimum GPA</SelectItem>
-                  <SelectItem value="course">Required Course</SelectItem>
-                  <SelectItem value="internship">Internship Hours</SelectItem>
-                  <SelectItem value="attendance">Attendance Rate</SelectItem>
-                  <SelectItem value="fees">Fees Cleared</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Min Total Credits</Label>
+                <Input
+                  type="number"
+                  value={requirementForm.min_total_credits}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, min_total_credits: e.target.value })
+                  }
+                  placeholder="e.g., 360"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Min Core Credits</Label>
+                <Input
+                  type="number"
+                  value={requirementForm.min_core_credits}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, min_core_credits: e.target.value })
+                  }
+                  placeholder="e.g., 240"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Min Elective Credits</Label>
+                <Input
+                  type="number"
+                  value={requirementForm.min_elective_credits}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, min_elective_credits: e.target.value })
+                  }
+                  placeholder="e.g., 120"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Min GPA</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={requirementForm.min_gpa}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, min_gpa: e.target.value })
+                  }
+                  placeholder="e.g., 2.0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Min Internship Hours</Label>
+                <Input
+                  type="number"
+                  value={requirementForm.min_internship_hours}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, min_internship_hours: e.target.value })
+                  }
+                  placeholder="e.g., 480"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="requires_internship"
+                  checked={requirementForm.requires_internship}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, requires_internship: e.target.checked })
+                  }
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="requires_internship">Requires Internship</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="requires_thesis"
+                  checked={requirementForm.requires_thesis}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, requires_thesis: e.target.checked })
+                  }
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="requires_thesis">Requires Thesis</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="requires_final_exam"
+                  checked={requirementForm.requires_final_exam}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, requires_final_exam: e.target.checked })
+                  }
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="requires_final_exam">Requires Final Exam</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="requires_fee_clearance"
+                  checked={requirementForm.requires_fee_clearance}
+                  onChange={(e) =>
+                    setRequirementForm({ ...requirementForm, requires_fee_clearance: e.target.checked })
+                  }
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="requires_fee_clearance">Requires Fee Clearance</Label>
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>Additional Requirements</Label>
               <Textarea
-                value={requirementForm.description}
+                value={requirementForm.additional_requirements}
                 onChange={(e) =>
-                  setRequirementForm({ ...requirementForm, description: e.target.value })
+                  setRequirementForm({ ...requirementForm, additional_requirements: e.target.value })
                 }
-                placeholder="e.g., Complete all Year 3 courses with passing grades"
+                placeholder="Any other graduation requirements..."
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Minimum Value (if applicable)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={requirementForm.min_value}
-                onChange={(e) =>
-                  setRequirementForm({ ...requirementForm, min_value: e.target.value })
-                }
-                placeholder="e.g., 120 for credits, 2.0 for GPA"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="is_mandatory"
-                checked={requirementForm.is_mandatory}
-                onChange={(e) =>
-                  setRequirementForm({ ...requirementForm, is_mandatory: e.target.checked })
-                }
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="is_mandatory">This requirement is mandatory</Label>
             </div>
           </div>
           <DialogFooter>
@@ -1036,12 +1144,12 @@ export default function GraduationPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Max Graduates (optional)</Label>
+                <Label>Capacity (optional)</Label>
                 <Input
                   type="number"
-                  value={ceremonyForm.max_graduates}
+                  value={ceremonyForm.capacity}
                   onChange={(e) =>
-                    setCeremonyForm({ ...ceremonyForm, max_graduates: e.target.value })
+                    setCeremonyForm({ ...ceremonyForm, capacity: e.target.value })
                   }
                   placeholder="Leave empty for unlimited"
                 />
@@ -1083,7 +1191,7 @@ export default function GraduationPage() {
           <DialogHeader>
             <DialogTitle>Graduation Status Details</DialogTitle>
             <DialogDescription>
-              {selectedStudent?.student?.first_name} {selectedStudent?.student?.last_name} -{' '}
+              {selectedStudent?.student?.full_name || `${selectedStudent?.student?.first_name} ${selectedStudent?.student?.surname}`} -{' '}
               {selectedStudent?.student?.student_number}
             </DialogDescription>
           </DialogHeader>
@@ -1092,34 +1200,76 @@ export default function GraduationPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Program</p>
-                  <p className="font-medium">{selectedStudent.program?.name || 'N/A'}</p>
+                  <p className="font-medium">{selectedStudent.program_enrollment?.program?.name || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <div className="mt-1">{getStatusBadge(selectedStudent.status)}</div>
+                  <div className="mt-1">{getStatusBadge(selectedStudent.graduation_status)}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">GPA</p>
+                  <p className="font-medium">{selectedStudent.current_gpa?.toFixed(2) ?? '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Credits</p>
+                  <p className="font-medium">{selectedStudent.total_credits_earned || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Core Credits</p>
+                  <p className="font-medium">{selectedStudent.core_credits_earned || 0}</p>
                 </div>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Requirements Progress</p>
-                <div className="flex items-center gap-3">
-                  <Progress
-                    value={
-                      selectedStudent.total_requirements > 0
-                        ? (selectedStudent.requirements_met / selectedStudent.total_requirements) *
-                          100
-                        : 0
-                    }
-                    className="flex-1 h-3"
-                  />
-                  <span className="font-medium">
-                    {selectedStudent.requirements_met}/{selectedStudent.total_requirements}
-                  </span>
+                <p className="text-sm text-muted-foreground mb-2">Requirements</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2">
+                    {selectedStudent.credits_requirement_met ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm">Credits</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedStudent.gpa_requirement_met ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm">GPA</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedStudent.fee_clearance_met ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm">Fee Clearance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedStudent.internship_requirement_met ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm">Internship</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedStudent.thesis_requirement_met ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm">Thesis</span>
+                  </div>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Eligibility</p>
                 <div className="mt-1">
-                  {selectedStudent.is_eligible ? (
+                  {isEligible(selectedStudent) ? (
                     <Badge className="bg-green-100 text-green-800">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Eligible to Graduate
@@ -1132,6 +1282,12 @@ export default function GraduationPage() {
                   )}
                 </div>
               </div>
+              {selectedStudent.graduation_honors && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Honors</p>
+                  <p className="font-medium">{selectedStudent.graduation_honors}</p>
+                </div>
+              )}
               <div className="pt-4 border-t">
                 <p className="text-sm text-muted-foreground mb-2">Actions</p>
                 <div className="flex gap-2">
@@ -1143,7 +1299,7 @@ export default function GraduationPage() {
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Recalculate
                   </Button>
-                  {selectedStudent.is_eligible && selectedStudent.status === 'pending' && (
+                  {isEligible(selectedStudent) && selectedStudent.graduation_status === 'pending' && (
                     <Button size="sm">
                       <CheckCircle2 className="h-4 w-4 mr-2" />
                       Approve for Graduation
