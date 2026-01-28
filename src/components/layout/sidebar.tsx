@@ -30,14 +30,18 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   UserPlus,
   ScrollText,
   Briefcase,
   Mail,
   FolderOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { useSidebarStore } from '@/stores/sidebar-store'
 
 interface NavItem {
   label: string
@@ -172,6 +176,7 @@ function NavGroupSection({
   currentTierLevel,
   tierHierarchy,
   onLockedClick,
+  sidebarCollapsed = false,
 }: {
   group: NavGroup
   isOpen: boolean
@@ -183,6 +188,7 @@ function NavGroupSection({
   currentTierLevel: number
   tierHierarchy: Record<string, number>
   onLockedClick: (module: string, tier: 'standard' | 'premium') => void
+  sidebarCollapsed?: boolean
 }) {
   // Filter items based on permissions
   const filteredItems = group.items.filter(item => {
@@ -207,6 +213,53 @@ function NavGroupSection({
       ? pathname === '/dashboard'
       : pathname === item.href || pathname.startsWith(item.href + '/')
   )
+
+  // When sidebar is collapsed, show items without group headers
+  if (sidebarCollapsed) {
+    return (
+      <div className="mb-1">
+        {filteredItems.map((item) => {
+          const isActive = item.href === '/dashboard'
+            ? pathname === '/dashboard'
+            : pathname === item.href || pathname.startsWith(item.href + '/')
+
+          if (item.isLocked) {
+            return (
+              <button
+                key={item.href}
+                onClick={() => onLockedClick(item.label, item.requiresTier || 'premium')}
+                title={item.label}
+                className="w-full flex items-center justify-center p-2.5 rounded-lg text-gray-400 hover:bg-gray-50 cursor-pointer group relative"
+              >
+                <span className="text-gray-300 group-hover:text-gray-400 transition-colors">
+                  {item.icon}
+                </span>
+              </button>
+            )
+          }
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              data-tour={item.tourId}
+              title={item.label}
+              className={`flex items-center justify-center p-2.5 rounded-lg transition-all duration-150 ${
+                isActive
+                  ? 'text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+              style={isActive ? { backgroundColor: primaryColor } : undefined}
+            >
+              <span className={isActive ? 'text-white/90' : ''}>
+                {item.icon}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <div className="mb-2">
@@ -280,6 +333,9 @@ export function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [lockedModule, setLockedModule] = useState<{ module: string; tier: 'standard' | 'premium' } | null>(null)
 
+  // Sidebar collapsed state from store
+  const { isCollapsed, toggleCollapsed } = useSidebarStore()
+
   // Track which groups are open - initialize from localStorage or defaults
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window !== 'undefined') {
@@ -352,37 +408,39 @@ export function Sidebar() {
   const NavContent = ({ mobile = false }: { mobile?: boolean }) => (
     <>
       {/* Logo Area */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-center gap-3">
+      <div className={`border-b border-gray-100 ${isCollapsed && !mobile ? 'p-2' : 'p-4'}`}>
+        <div className={`flex items-center ${isCollapsed && !mobile ? 'justify-center' : 'gap-3'}`}>
           {logoUrl ? (
             logoUrl.includes('127.0.0.1') || logoUrl.includes('localhost') ? (
               <img
                 src={logoUrl}
                 alt={institutionName}
-                className="rounded-xl bg-gray-50 p-1 object-contain w-10 h-10 flex-shrink-0"
+                className={`rounded-xl bg-gray-50 p-1 object-contain flex-shrink-0 ${isCollapsed && !mobile ? 'w-9 h-9' : 'w-10 h-10'}`}
               />
             ) : (
               <Image
                 src={logoUrl}
                 alt={institutionName}
-                width={40}
-                height={40}
+                width={isCollapsed && !mobile ? 36 : 40}
+                height={isCollapsed && !mobile ? 36 : 40}
                 className="rounded-xl bg-gray-50 p-1 object-contain flex-shrink-0"
               />
             )
           ) : (
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 shadow-sm"
+              className={`rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 shadow-sm ${isCollapsed && !mobile ? 'w-9 h-9 text-sm' : 'w-10 h-10'}`}
               style={{ backgroundColor: primaryColor }}
             >
               {institutionName.charAt(0)}
             </div>
           )}
-          <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
-              {institutionName}
-            </h2>
-          </div>
+          {(!isCollapsed || mobile) && (
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
+                {institutionName}
+              </h2>
+            </div>
+          )}
           {mobile && (
             <button
               onClick={() => setIsMobileOpen(false)}
@@ -394,8 +452,28 @@ export function Sidebar() {
         </div>
       </div>
 
+      {/* Collapse Toggle Button (Desktop only) */}
+      {!mobile && (
+        <div className={`px-2 py-2 border-b border-gray-100 ${isCollapsed ? 'flex justify-center' : ''}`}>
+          <button
+            onClick={toggleCollapsed}
+            className={`flex items-center gap-2 p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors ${isCollapsed ? '' : 'w-full'}`}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="w-5 h-5" />
+            ) : (
+              <>
+                <PanelLeftClose className="w-5 h-5" />
+                <span className="text-xs font-medium">Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Navigation Groups */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+      <nav className={`flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent ${isCollapsed && !mobile ? 'px-1.5 py-2' : 'px-3 py-4'}`}>
         {institutionNavGroups.map((group) => (
           <NavGroupSection
             key={group.label}
@@ -409,6 +487,7 @@ export function Sidebar() {
             currentTierLevel={currentTierLevel}
             tierHierarchy={tierHierarchy}
             onLockedClick={(module, tier) => setLockedModule({ module, tier })}
+            sidebarCollapsed={isCollapsed && !mobile}
           />
         ))}
       </nav>
@@ -456,26 +535,49 @@ export function Sidebar() {
       )}
 
       {/* User section */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-        <div className="flex items-center gap-3 mb-3">
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium"
-            style={{ backgroundColor: primaryColor }}
-          >
-            {user?.full_name?.charAt(0) || 'U'}
+      <div className={`border-t border-gray-100 bg-gray-50/50 ${isCollapsed && !mobile ? 'p-2' : 'p-4'}`}>
+        {isCollapsed && !mobile ? (
+          // Collapsed view - just avatar and logout icon
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium"
+              style={{ backgroundColor: primaryColor }}
+              title={user?.full_name || 'User'}
+            >
+              {user?.full_name?.charAt(0) || 'U'}
+            </div>
+            <button
+              onClick={signOut}
+              className="p-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-gray-900 text-sm truncate">{user?.full_name}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-          </div>
-        </div>
-        <button
-          onClick={signOut}
-          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full border border-gray-200 hover:border-red-200"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="text-sm font-medium">Sign Out</span>
-        </button>
+        ) : (
+          // Expanded view
+          <>
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {user?.full_name?.charAt(0) || 'U'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-gray-900 text-sm truncate">{user?.full_name}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={signOut}
+              className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full border border-gray-200 hover:border-red-200"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm font-medium">Sign Out</span>
+            </button>
+          </>
+        )}
       </div>
     </>
   )
@@ -505,7 +607,7 @@ export function Sidebar() {
       </aside>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed top-0 left-0 h-screen w-64 bg-white border-r border-gray-100 flex-col z-30">
+      <aside className={`hidden lg:flex fixed top-0 left-0 h-screen bg-white border-r border-gray-100 flex-col z-30 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
         <NavContent />
       </aside>
     </>

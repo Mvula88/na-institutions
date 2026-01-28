@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/auth-store'
+import { useSidebarStore } from '@/stores/sidebar-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Loader2 } from 'lucide-react'
 import { ProductTour } from '@/components/onboarding'
@@ -17,6 +18,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const { user, isAuthenticated, isInitialized } = useAuthStore()
+  const { isCollapsed } = useSidebarStore()
 
   useEffect(() => {
     // Only redirect after auth state is fully initialized
@@ -50,7 +52,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="flex flex-col min-h-screen lg:ml-64 pt-14 lg:pt-0">
+      <main className={`flex flex-col min-h-screen pt-14 lg:pt-0 transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
         <div className="flex-1">
           {children}
         </div>
