@@ -31,6 +31,8 @@ import {
   BookOpenCheck,
   Info,
   GraduationCap,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import StudentNumberConfig from '@/components/settings/student-number-config'
@@ -91,6 +93,7 @@ export default function InstitutionSettingsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const [profileData, setProfileData] = useState({
     full_name: user?.full_name || '',
@@ -524,26 +527,42 @@ export default function InstitutionSettingsPage() {
         </div>
 
         {/* Desktop Sidebar Tabs */}
-        <div className="hidden lg:block w-56 flex-shrink-0">
+        <div className={`hidden lg:block flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-56'}`}>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2">
+            {/* Collapse Toggle Button */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="w-full flex items-center justify-center p-2 mb-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="w-5 h-5" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5" />
+              )}
+            </button>
+
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                title={sidebarCollapsed ? tab.label : undefined}
+                className={`w-full flex items-center rounded-lg text-left transition-colors ${
+                  sidebarCollapsed ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'
+                } ${
                   activeTab === tab.id
                     ? 'bg-blue-50 text-blue-700'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 {tab.icon}
-                <span className="font-medium text-sm">{tab.label}</span>
+                {!sidebarCollapsed && <span className="font-medium text-sm">{tab.label}</span>}
               </button>
             ))}
           </div>
 
           {/* Module Status */}
-          {isInstitutionAdmin() && (
+          {isInstitutionAdmin() && !sidebarCollapsed && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mt-6">
               <h3 className="font-medium text-gray-900 mb-3">Active Modules</h3>
               <div className="space-y-2">
